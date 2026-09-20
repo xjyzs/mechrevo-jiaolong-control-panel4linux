@@ -5,6 +5,8 @@
 #include <sys/wait.h>
 #include <linux/limits.h>
 #include <cstdlib>
+#include <mutex>
+#include <csignal>
 
 namespace {
     bool read_exact(int fd, void *buf, size_t count) {
@@ -87,6 +89,7 @@ public:
     }
 
     int exec(const std::string &cmd, std::string *out_output = nullptr) {
+        std::lock_guard<std::mutex> lock(mutex_);
         if (!ensure_started()) return -1;
 
         if (!send_msg(to_child_, cmd)) {
@@ -112,7 +115,10 @@ public:
     RootSession &operator=(const RootSession &) = delete;
 
 private:
-    RootSession() = default;
+    RootSession() {
+        signal(SIGPIPE, SIG_IGN);
+    }
+
 
     bool ensure_started() {
         if (pid_ > 0) return true;
@@ -153,6 +159,7 @@ private:
         to_child_ = from_child_ = -1;
     }
 
+    std::mutex mutex_;
     int to_child_ = -1;
     int from_child_ = -1;
     pid_t pid_ = -1;

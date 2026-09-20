@@ -44,6 +44,24 @@ void checkGpuAfterReboot(slint::ComponentHandle<MainWindow> ui) {
     }).detach();
 }
 
+void checkPerfMode(slint::ComponentHandle<MainWindow> ui) {
+    thread([app_handle = slint::ComponentWeakHandle(ui)]() {
+        string result;
+        root_system("echo '\\_SB.INOU.ECRR 0x0751' | tee /proc/acpi/call;cat /proc/acpi/call", &result);
+        if (!result.empty()) {
+            int perfMode=-1;
+            if (result.ends_with("a0")) perfMode = 0;
+            else if (result.ends_with("10")) perfMode = 2;
+            else if (result.ends_with('0')) perfMode = 1;
+            slint::invoke_from_event_loop([app_handle, perfMode]() {
+                if (auto strong_app = app_handle.lock()) {
+                    (*strong_app)->set_perfMode(perfMode);
+                }
+            });
+        }
+    }).detach();
+}
+
 int main(int argc, char *argv[]) {
     // 如果包含 --root-daemon 参数, 则启动特权命令执行器, 不启动 UI
     if (argc > 1 && strcmp(argv[1], "--root-daemon") == 0) {
@@ -55,6 +73,7 @@ int main(int argc, char *argv[]) {
     checkOnlineStatus(ui);
     checkGpu(ui);
     checkGpuAfterReboot(ui);
+    checkPerfMode(ui);
 
     ui->on_onlineStatusToggled([ui](bool i) {
         if (i) root_system("echo '\\_SB.INOU.ECRW 0x0741 0x0' | sudo tee /proc/acpi/call");
@@ -86,6 +105,13 @@ int main(int argc, char *argv[]) {
         "os.close(fd)"
         "'");
         checkGpuAfterReboot(ui);
+    });
+
+    ui->on_perfModeChange([ui](int i) {
+        if (i==0) root_system("echo '\\_SB.INOU.ECRW 0x0751 0xa0' | tee /proc/acpi/call");
+        else if (i==1) root_system("echo '\\_SB.INOU.ECRW 0x0751 0x0' | tee /proc/acpi/call");
+        else if (i==2) root_system("echo '\\_SB.INOU.ECRW 0x0751 0x10' | tee /proc/acpi/call");
+        checkPerfMode(ui);
     });
 
     ui->run();

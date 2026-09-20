@@ -8,6 +8,7 @@ import {
     Palette,
     ScrollView,
     Switch,
+    RadioGroup,
 } from "std-widgets.slint";
 
 
@@ -23,8 +24,10 @@ export component MainWindow inherits Window {
     in-out property <bool> onlineStatus;
     in-out property <bool> nvidiaStatus;
     in-out property <bool> nvidiaStatusAfterReboot;
+    in-out property <int> perfMode;
     callback onlineStatusToggled(bool);
     callback gpuToggled(bool);
+    callback perfModeChange(int);
 
     ScrollView {
         HorizontalLayout {
@@ -66,6 +69,42 @@ export component MainWindow inherits Window {
                         Switch {
                             checked: nvidiaStatusAfterReboot;
                             toggled => { gpuToggled(nvidiaStatusAfterReboot) }
+                        }
+                    }
+                }
+
+                RadioGroup {
+                    orientation: horizontal;
+                    RadioButton {
+                        text: "办公";
+                        checked: perfMode == 0;
+                        toggled => {
+                            if (self.checked) {
+                                perfMode = 0;
+                                perfModeChange(perfMode);
+                            }
+                        }
+                    }
+
+                    RadioButton {
+                        text: "均衡";
+                        checked: perfMode == 1;
+                        toggled => {
+                            if (self.checked) {
+                                perfMode = 1;
+                                perfModeChange(perfMode);
+                            }
+                        }
+                    }
+
+                    RadioButton {
+                        text: "狂暴";
+                        checked: perfMode == 2;
+                        toggled => {
+                            if (self.checked) {
+                                perfMode = 2;
+                                perfModeChange(perfMode);
+                            }
                         }
                     }
                 }
