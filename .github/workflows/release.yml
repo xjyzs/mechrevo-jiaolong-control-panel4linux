@@ -5,11 +5,6 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
-    inputs:
-      version:
-        description: '版本号(如 v1.0)'
-        required: false
-        default: ''
 
 permissions:
   contents: write
@@ -32,6 +27,7 @@ jobs:
             build-essential \
             cmake \
             ninja-build \
+            ccache \
             libfontconfig1-dev \
             libxkbcommon-dev \
             libxcb-shape0-dev \
@@ -42,13 +38,43 @@ jobs:
       - name: 安装 Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Rust 缓存
-        uses: Swatinem/rust-cache@v2
+      - name: 缓存 Cargo 依赖
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/CMakeLists.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: 配置 ccache 缓存
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ${{ runner.os }}-ccache-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-
+
+      - name: 缓存 CMake 外部依赖
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: ${{ runner.os }}-cmake-deps-${{ hashFiles('**/CMakeLists.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-cmake-deps-
 
       - name: 编译
         run: |
+          export CCACHE_DIR=~/.cache/ccache
+          ccache -z
+
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
             -DCMAKE_INSTALL_RPATH='$ORIGIN'
 
@@ -56,15 +82,7 @@ jobs:
 
       - name: 打包 Release
         run: |
-          INPUT_VERSION="${{ github.event.inputs.version }}"
-          if [ -n "${INPUT_VERSION}" ]; then
-            VERSION="${INPUT_VERSION}"
-          elif [ -n "${GITHUB_REF_NAME}" ]; then
-            VERSION="${GITHUB_REF_NAME}"
-          else
-            VERSION="manual"
-          fi
-
+          VERSION=${GITHUB_REF_NAME:-manual}
           PACKAGE_DIR="${APP_NAME}-${VERSION}-linux-x86_64"
           mkdir -p "${PACKAGE_DIR}"
 
@@ -79,12 +97,10 @@ jobs:
           tar -czvf "${ARCHIVE_NAME}" "${PACKAGE_DIR}"
 
           echo "ARCHIVE_NAME=${ARCHIVE_NAME}" >> $GITHUB_ENV
-          echo "RELEASE_TAG=${VERSION}" >> $GITHUB_ENV
 
       - name: 发布到 GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.RELEASE_TAG }}
           files: ${{ env.ARCHIVE_NAME }}
           draft: false
           prerelease: false
