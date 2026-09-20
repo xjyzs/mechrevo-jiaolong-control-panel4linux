@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 jobs:
-  build-linux:
+  build:
     runs-on: ubuntu-22.04
 
     env:
@@ -67,16 +67,24 @@ jobs:
             ${{ runner.os }}-cmake-deps-
 
       - name: 编译
+        env:
+          CCACHE_DIR: ~/.cache/ccache
+          CARGO_PROFILE_RELEASE_LTO: "true"
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
+          CARGO_PROFILE_RELEASE_PANIC: "abort"
+          CARGO_PROFILE_RELEASE_STRIP: "true"
         run: |
-          export CCACHE_DIR=~/.cache/ccache
           ccache -z
 
           cmake -B build -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
-            -DCMAKE_INSTALL_RPATH='$ORIGIN'
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+          -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
+          -DCMAKE_INSTALL_RPATH='$ORIGIN' \
+          -DCMAKE_CXX_FLAGS_RELEASE="-O3 -ffunction-sections -fdata-sections" \
+          -DCMAKE_EXE_LINKER_FLAGS="-Wl,--gc-sections -Wl,--as-needed" \
+          -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--gc-sections -Wl,--as-needed"
 
           cmake --build build --config Release
 
@@ -87,15 +95,16 @@ jobs:
           mkdir -p "${PACKAGE_DIR}"
 
           find build -maxdepth 3 -type f -name "${APP_NAME}" -exec cp {} "${PACKAGE_DIR}/" \;
-          chmod +x "${PACKAGE_DIR}/${APP_NAME}"
-
           find build -maxdepth 3 -type f -name "libslint*.so*" -exec cp {} "${PACKAGE_DIR}/" \; || true
 
-          # cp -r assets "${PACKAGE_DIR}/" || true
+          strip --strip-unneeded "${PACKAGE_DIR}/${APP_NAME}" || true
+          strip --strip-unneeded "${PACKAGE_DIR}"/libslint*.so* || true
+          
+          chmod +x "${PACKAGE_DIR}/${APP_NAME}"
 
           ARCHIVE_NAME="${PACKAGE_DIR}.tar.gz"
-          tar -czvf "${ARCHIVE_NAME}" "${PACKAGE_DIR}"
-
+          GZIP=-9 tar -czvf "${ARCHIVE_NAME}" "${PACKAGE_DIR}"
+          
           echo "ARCHIVE_NAME=${ARCHIVE_NAME}" >> $GITHUB_ENV
 
       - name: 发布到 GitHub Release
