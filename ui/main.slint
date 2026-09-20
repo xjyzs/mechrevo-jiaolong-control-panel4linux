@@ -1,0 +1,137 @@
+import {
+    AboutSlint,
+    VerticalBox,
+    Button,
+    HorizontalBox,
+    StandardButton,
+    Button,
+    Palette,
+    ScrollView,
+    Switch,
+} from "std-widgets.slint";
+
+
+
+export component MainWindow inherits Window {
+    callback button_clicked();
+    preferred-height: 768px;
+    preferred-width: 1024px;
+    max-width: 100000px;
+    max-height: 100000px;
+    background: #e2f9f7;
+
+    in-out property <bool> onlineStatus;
+    in-out property <bool> nvidiaStatus;
+    in-out property <bool> nvidiaStatusAfterReboot;
+    callback onlineStatusToggled(bool);
+    callback gpuToggled(bool);
+
+    ScrollView {
+        HorizontalLayout {
+            // 左栏
+            VerticalBox {
+                alignment: start;
+                Text {
+                    text: "Control Panel";
+                    font-size: 36px;
+                }
+
+                Rectangle {
+                    height: self.preferred-height;
+                    background: #FFFFFF;
+                    border-radius: 8px;
+                    HorizontalBox {
+                        Text {
+                            text: "控制台在线状态";
+                            font-size: 16px;
+                        }
+
+                        Switch {
+                            checked: onlineStatus;
+                            toggled => { onlineStatusToggled(onlineStatus) }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    height: self.preferred-height;
+                    background: #FFFFFF;
+                    border-radius: 8px;
+                    HorizontalBox {
+                        Text {
+                            text: "独显直连";
+                            font-size: 16px;
+                        }
+
+                        Switch {
+                            checked: nvidiaStatusAfterReboot;
+                            toggled => { gpuToggled(nvidiaStatusAfterReboot) }
+                        }
+                    }
+                }
+            }
+
+            // 右栏
+            VerticalBox {
+                alignment: start;
+
+                Rectangle {
+                    width: self.preferred-width;
+                    background: #FFFFFF;
+                    border-radius: 8px;
+                    VerticalBox {
+                        Text {
+                            text: "控制台在线状态";
+                            font-size: 16px;
+                            color: #345b55;
+                        }
+
+                        Text {
+                            text: onlineStatus ? "在线" : "离线";
+                            font-size: 24px;
+                            font-weight: 0;
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width: self.preferred-width;
+                    background: #FFFFFF;
+                    border-radius: 8px;
+                    VerticalBox {
+                        Text {
+                            text: "显卡状态";
+                            font-size: 16px;
+                            color: #345b55;
+                        }
+
+                        Text {
+                            text: nvidiaStatus ? "独显直连" : "混合输出";
+                            font-size: 24px;
+                            font-weight: 0;
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width: self.preferred-width;
+                    background: #FFFFFF;
+                    border-radius: 8px;
+                    VerticalBox {
+                        Text {
+                            text: "重启后的显卡状态";
+                            font-size: 16px;
+                            color: #345b55;
+                        }
+
+                        Text {
+                            text: nvidiaStatusAfterReboot ? "独显直连" : "混合输出";
+                            font-size: 24px;
+                            font-weight: 0;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

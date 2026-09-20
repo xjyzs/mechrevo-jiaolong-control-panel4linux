@@ -1,0 +1,76 @@
+name: 编译并发布
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-22.04
+
+    env:
+      APP_NAME: ControlPanel
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 安装依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            ninja-build \
+            libfontconfig1-dev \
+            libxkbcommon-dev \
+            libxcb-shape0-dev \
+            libxcb-xfixes0-dev \
+            libx11-dev \
+            libgl1-mesa-dev
+
+      - name: 安装 Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust 缓存
+        uses: Swatinem/rust-cache@v2
+
+      - name: 编译
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
+            -DCMAKE_INSTALL_RPATH='$ORIGIN'
+
+          cmake --build build --config Release
+
+      - name: 打包 Release
+        run: |
+          VERSION=${GITHUB_REF_NAME:-manual}
+          PACKAGE_DIR="${APP_NAME}-${VERSION}-linux-x86_64"
+          mkdir -p "${PACKAGE_DIR}"
+
+          find build -maxdepth 3 -type f -name "${APP_NAME}" -exec cp {} "${PACKAGE_DIR}/" \;
+          chmod +x "${PACKAGE_DIR}/${APP_NAME}"
+
+          find build -maxdepth 3 -type f -name "libslint*.so*" -exec cp {} "${PACKAGE_DIR}/" \; || true
+
+          # cp -r assets "${PACKAGE_DIR}/" || true
+
+          ARCHIVE_NAME="${PACKAGE_DIR}.tar.gz"
+          tar -czvf "${ARCHIVE_NAME}" "${PACKAGE_DIR}"
+
+          echo "ARCHIVE_NAME=${ARCHIVE_NAME}" >> $GITHUB_ENV
+
+      - name: 发布到 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ARCHIVE_NAME }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
