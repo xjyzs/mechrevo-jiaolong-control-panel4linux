@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号(如 v1.0)'
+        required: false
+        default: ''
 
 permissions:
   contents: write
