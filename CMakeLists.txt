@@ -14,8 +14,9 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Slint)
 
 add_executable(ControlPanel main.cpp
-        sudoHelper.hpp
-        utils/gpuUtil.hpp)
+        utils/sudoHelper.hpp
+        utils/gpuUtil.hpp
+        utils/ecUtil.hpp)
 
 slint_target_sources(ControlPanel ui/main.slint)
 

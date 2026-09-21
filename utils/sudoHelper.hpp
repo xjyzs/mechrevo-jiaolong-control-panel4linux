@@ -1,3 +1,4 @@
+#pragma once
 #include <cstdint>
 #include <cstdio>
 #include <string>
@@ -166,10 +167,16 @@ private:
 };
 
 // 对外接口
+/**
+ * @brief 用 Root 执行命令, 提供输出
+ */
 int root_system(const std::string &cmd, std::string *output) {
     return RootSession::instance().exec(cmd, output);
 }
 
+/**
+ * @brief 用 Root 执行命令
+ */
 int root_system(const std::string &cmd) {
     return RootSession::instance().exec(cmd, nullptr);
 }

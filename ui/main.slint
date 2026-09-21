@@ -19,12 +19,20 @@ export component MainWindow inherits Window {
     preferred-width: 1024px;
     max-width: 100000px;
     max-height: 100000px;
-    background: #e2f9f7;
+    background: #E2E2E9;
 
     in-out property <bool> onlineStatus;
     in-out property <bool> nvidiaStatus;
     in-out property <bool> nvidiaStatusAfterReboot;
-    in-out property <int> perfMode;
+    in-out property <int> perfMode:-1;
+    in-out property <bool> modeRadioGroupEnabled:false;
+    in-out property <float> cpuFanRatio:-1;
+    in-out property <float> gpuFanRatio:-1;
+    in-out property <int> cpuFan:-1;
+    in-out property <int> gpuFan:-1;
+    // 应用完成初始化
+    in-out property <bool> initialized: false;
+
     callback onlineStatusToggled(bool);
     callback gpuToggled(bool);
     callback perfModeChange(int);
@@ -50,7 +58,7 @@ export component MainWindow inherits Window {
                         }
 
                         Switch {
-                            checked: onlineStatus;
+                            checked <=> onlineStatus;
                             toggled => { onlineStatusToggled(onlineStatus) }
                         }
                     }
@@ -67,7 +75,7 @@ export component MainWindow inherits Window {
                         }
 
                         Switch {
-                            checked: nvidiaStatusAfterReboot;
+                            checked <=> nvidiaStatusAfterReboot;
                             toggled => { gpuToggled(nvidiaStatusAfterReboot) }
                         }
                     }
@@ -75,12 +83,14 @@ export component MainWindow inherits Window {
 
                 RadioGroup {
                     orientation: horizontal;
+                    enabled <=> modeRadioGroupEnabled;
                     RadioButton {
                         text: "办公";
                         checked: perfMode == 0;
                         toggled => {
-                            if (self.checked) {
+                            if (initialized && self.checked) {
                                 perfMode = 0;
+                                modeRadioGroupEnabled = false;
                                 perfModeChange(perfMode);
                             }
                         }
@@ -90,8 +100,9 @@ export component MainWindow inherits Window {
                         text: "均衡";
                         checked: perfMode == 1;
                         toggled => {
-                            if (self.checked) {
+                            if (initialized && self.checked) {
                                 perfMode = 1;
+                                modeRadioGroupEnabled = false;
                                 perfModeChange(perfMode);
                             }
                         }
@@ -99,10 +110,52 @@ export component MainWindow inherits Window {
 
                     RadioButton {
                         text: "狂暴";
-                        checked: perfMode == 2;
+                        checked: perfMode >= 2 && perfMode < 5;
                         toggled => {
-                            if (self.checked) {
+                            if (initialized && self.checked) {
                                 perfMode = 2;
+                                modeRadioGroupEnabled = false;
+                                perfModeChange(perfMode);
+                            }
+                        }
+                    }
+
+                    RadioButton {
+                        text: "自定义";
+                        enabled: onlineStatus;
+                        checked: perfMode == 5;
+                        toggled => {
+                            if (initialized && self.checked) {
+                                perfMode = 5;
+                                modeRadioGroupEnabled = false;
+                                perfModeChange(perfMode);
+                            }
+                        }
+                    }
+                }
+
+                RadioGroup {
+                    orientation: horizontal;
+                    enabled: perfMode >= 2 && perfMode < 5 && onlineStatus;
+                    RadioButton {
+                        text: "静音";
+                        checked: perfMode == 3;
+                        toggled => {
+                            if (initialized && self.checked) {
+                                perfMode = 3;
+                                modeRadioGroupEnabled = false;
+                                perfModeChange(perfMode);
+                            }
+                        }
+                    }
+
+                    RadioButton {
+                        text: "高能";
+                        checked: perfMode == 4;
+                        toggled => {
+                            if (initialized && self.checked) {
+                                perfMode = 4;
+                                modeRadioGroupEnabled = false;
                                 perfModeChange(perfMode);
                             }
                         }
@@ -115,14 +168,13 @@ export component MainWindow inherits Window {
                 alignment: start;
 
                 Rectangle {
-                    width: self.preferred-width;
                     background: #FFFFFF;
                     border-radius: 8px;
                     VerticalBox {
                         Text {
                             text: "控制台在线状态";
                             font-size: 16px;
-                            color: #345b55;
+                            color: #405F90;
                         }
 
                         Text {
@@ -134,18 +186,35 @@ export component MainWindow inherits Window {
                 }
 
                 Rectangle {
-                    width: self.preferred-width;
                     background: #FFFFFF;
                     border-radius: 8px;
                     VerticalBox {
                         Text {
                             text: "显卡状态";
                             font-size: 16px;
-                            color: #345b55;
+                            color: #405F90;
                         }
 
                         Text {
                             text: nvidiaStatus ? "独显直连" : "混合输出";
+                            font-size: 24px;
+                            font-weight: 0;
+                        }
+                    }
+                }
+
+                Rectangle {
+                    background: #FFFFFF;
+                    border-radius: 8px;
+                    VerticalBox {
+                        Text {
+                            text: "重启后的显卡状态";
+                            font-size: 16px;
+                            color: #405F90;
+                        }
+
+                        Text {
+                            text: nvidiaStatusAfterReboot ? "独显直连" : "混合输出";
                             font-size: 24px;
                             font-weight: 0;
                         }
@@ -158,16 +227,107 @@ export component MainWindow inherits Window {
                     border-radius: 8px;
                     VerticalBox {
                         Text {
-                            text: "重启后的显卡状态";
+                            text: "GPU 风扇转速百分比";
                             font-size: 16px;
-                            color: #345b55;
+                            color: #405F90;
                         }
 
                         Text {
-                            text: nvidiaStatusAfterReboot ? "独显直连" : "混合输出";
+                            text: gpuFanRatio + "%";
                             font-size: 24px;
                             font-weight: 0;
                         }
+                    }
+                }
+
+                Rectangle {
+                    background: #FFFFFF;
+                    border-radius: 8px;
+                    VerticalBox {
+                        Text {
+                            text: "CPU 风扇转速百分比";
+                            font-size: 16px;
+                            color: #405F90;
+                        }
+
+                        Text {
+                            text: cpuFanRatio + "%";
+                            font-size: 24px;
+                            font-weight: 0;
+                        }
+                    }
+                }
+
+                Rectangle {
+                    background: #FFFFFF;
+                    border-radius: 8px;
+                    VerticalBox {
+                        Text {
+                            text: "GPU 风扇转速";
+                            font-size: 16px;
+                            color: #405F90;
+                        }
+
+                        Text {
+                            text: gpuFan;
+                            font-size: 24px;
+                            font-weight: 0;
+                        }
+                    }
+                }
+
+                Rectangle {
+                    background: #FFFFFF;
+                    border-radius: 8px;
+                    VerticalBox {
+                        Text {
+                            text: "CPU 风扇转速";
+                            font-size: 16px;
+                            color: #405F90;
+                        }
+
+                        Text {
+                            text: cpuFan;
+                            font-size: 24px;
+                            font-weight: 0;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    in-out property <bool> show_alert: false;
+    if show_alert: Rectangle {
+        background: #00000066;
+
+        Rectangle {
+            width: 320px;
+            height: 220px;
+            background: #ffffff;
+            border-radius: 12px;
+
+            VerticalBox {
+                padding: 20px;
+                alignment: space-between;
+
+                Text {
+                    text: "需要安装 ACPI Call";
+                    font-size: 18px;
+                    font-weight: 700;
+                }
+
+                Text {
+                    text: "未在你的设备中找到 /proc/acpi/call 或安装后未重启, 请安装并重启电脑\n安装方法取决于你的 Linux 发行版\n如:\nsudo pacman -S acpi_call-dkms";
+                    color: #333333;
+                    wrap: word-wrap;
+                }
+
+                Button {
+                    text: "确定";
+                    primary: true;
+                    clicked => {
+                        show_alert = false;
                     }
                 }
             }
