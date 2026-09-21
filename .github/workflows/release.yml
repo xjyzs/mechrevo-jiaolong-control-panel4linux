@@ -13,13 +13,17 @@ on:
 
 permissions:
   contents: write
-
+  actions: write 
 jobs:
   build:
     runs-on: ubuntu-22.04
 
     env:
       APP_NAME: ControlPanel
+      SCCACHE_DIR: /home/runner/.cache/sccache
+      RUSTC_WRAPPER: sccache
+      CMAKE_C_COMPILER_LAUNCHER: sccache
+      CMAKE_CXX_COMPILER_LAUNCHER: sccache
 
     steps:
       - name: Checkout repository
@@ -32,7 +36,6 @@ jobs:
             build-essential \
             cmake \
             ninja-build \
-            ccache \
             libfontconfig1-dev \
             libxkbcommon-dev \
             libxcb-shape0-dev \
@@ -44,30 +47,37 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: 配置 sccache
-        uses: mozilla-actions/sccache-action@v0.0.8
-
-      - name: 配置 Cargo 依赖下载缓存
+        uses: mozilla-actions/sccache-action@v0.0.11
+      - name: 配置 Cargo 依赖缓存
         uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-deps-${{ hashFiles('**/CMakeLists.txt') }}
+          key: ${{ runner.os }}-cargo-deps-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-deps-
+      - name: 配置 sccache 编译产物缓存
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.SCCACHE_DIR }}
+          key: ${{ runner.os }}-sccache-${{ hashFiles('**/CMakeLists.txt', '**/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-sccache-${{ hashFiles('**/CMakeLists.txt', '**/Cargo.lock') }}-
+            ${{ runner.os }}-sccache-
 
       - name: 编译
         env:
-          SCCACHE_GHA_ENABLED: "true"
-          RUSTC_WRAPPER: sccache
-          CMAKE_C_COMPILER_LAUNCHER: sccache
-          CMAKE_CXX_COMPILER_LAUNCHER: sccache
+          SCCACHE_CACHE_SIZE: "2G"
           CARGO_PROFILE_RELEASE_LTO: "true"
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
           CARGO_PROFILE_RELEASE_PANIC: "abort"
           CARGO_PROFILE_RELEASE_STRIP: "true"
         run: |
+          sccache --start-server
+          sccache --zero-stats
+
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
@@ -77,6 +87,7 @@ jobs:
             -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--gc-sections -Wl,--as-needed"
 
           cmake --build build --config Release
+          sccache --show-stats
 
       - name: 打包 Release
         run: |
