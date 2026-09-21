@@ -2,7 +2,6 @@
 #include <cstring>
 #include <iostream>
 #include <fstream>
-#include <fcntl.h>
 #include <unistd.h>
 #include <filesystem>
 #include "utils/sudoHelper.hpp"
@@ -11,9 +10,9 @@
 
 using namespace std;
 
-void checkOnlineStatus(slint::ComponentHandle<MainWindow> ui) {
+static void checkOnlineStatus(const slint::ComponentHandle<MainWindow>& ui) {
     thread([app_handle = slint::ComponentWeakHandle(ui)]() {
-        int result=readEc(0x0741);
+        const int result=readEc(0x0741);
         bool onlineStatus = result==0x81||result==0x1;
         slint::invoke_from_event_loop([app_handle, onlineStatus]() {
             if (auto strong_app = app_handle.lock()) {
@@ -23,7 +22,7 @@ void checkOnlineStatus(slint::ComponentHandle<MainWindow> ui) {
     }).detach();
 }
 
-void checkGpu(slint::ComponentHandle<MainWindow> ui) {
+static void checkGpu(const slint::ComponentHandle<MainWindow>& ui) {
     thread([app_handle = slint::ComponentWeakHandle(ui)] {
         bool result = isNvidiaConnected();
         slint::invoke_from_event_loop([app_handle, result] {
@@ -34,7 +33,7 @@ void checkGpu(slint::ComponentHandle<MainWindow> ui) {
     }).detach();
 }
 
-void checkGpuAfterReboot(slint::ComponentHandle<MainWindow> ui) {
+static void checkGpuAfterReboot(const slint::ComponentHandle<MainWindow>& ui) {
     thread([app_handle = slint::ComponentWeakHandle(ui)] {
         bool result = getGpuAfterReboot();
         slint::invoke_from_event_loop([app_handle, result] {
@@ -45,7 +44,7 @@ void checkGpuAfterReboot(slint::ComponentHandle<MainWindow> ui) {
     }).detach();
 }
 
-void checkPerfMode(slint::ComponentHandle<MainWindow> ui) {
+static void checkPerfMode(const slint::ComponentHandle<MainWindow>& ui) {
     thread([app_handle = slint::ComponentWeakHandle(ui)]() {
         int result = readEc(0x0751);
         int resultWild = readEc(0x0728);
@@ -69,7 +68,7 @@ void checkPerfMode(slint::ComponentHandle<MainWindow> ui) {
     }).detach();
 }
 
-void checkFan(slint::ComponentHandle<MainWindow> ui) {
+static void checkFan(const slint::ComponentHandle<MainWindow>& ui) {
     thread([app_handle = slint::ComponentWeakHandle(ui)] {
         while (true) {
             string result;
@@ -92,7 +91,7 @@ void checkFan(slint::ComponentHandle<MainWindow> ui) {
 }
 
 
-int main(int argc, char *argv[]) {
+int main(const int argc, char *argv[]) {
     // 如果包含 --root-daemon 参数, 则启动特权命令执行器, 不启动 UI
     if (argc > 1 && strcmp(argv[1], "--root-daemon") == 0) {
         return run_as_root_daemon();
@@ -106,8 +105,8 @@ int main(int argc, char *argv[]) {
     checkPerfMode(ui);
     checkFan(ui);
 
-    fs::path acpiCallFile = "/proc/acpi/call";
-    if (!fs::exists(acpiCallFile)) ui->set_show_alert(true);
+    const fs::path acpiCallFile = "/proc/acpi/call";
+    if (!fs::exists(acpiCallFile)) ui->set_show_acpi_call_alert(true);
 
     ui->on_onlineStatusToggled([ui](bool i) {
         if (i) writeEc(0x0741,0x1);
@@ -115,7 +114,7 @@ int main(int argc, char *argv[]) {
         checkOnlineStatus(ui);
     });
 
-    ui->on_gpuToggled([ui](bool i) {
+    ui->on_gpuToggled([ui](const bool i) {
         if (i)
             root_system("python3 -c '"
                 "import os, subprocess; "
@@ -139,9 +138,10 @@ int main(int argc, char *argv[]) {
                 "os.close(fd)"
                 "'");
         checkGpuAfterReboot(ui);
+        ui->set_show_reboot_alert(true);
     });
 
-    ui->on_perfModeChange([ui](int i) {
+    ui->on_perfModeChange([ui](const int i) {
         cout << i << endl;
         if (i == 5) writeEc(0x0727,0x40);
         else {
@@ -156,6 +156,10 @@ int main(int argc, char *argv[]) {
         }
         checkPerfMode(ui);
     });
+
+    ui->on_reboot([ui] {
+    root_system("reboot");
+});
 
     ui->run();
     return 0;

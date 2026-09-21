@@ -10,6 +10,7 @@ import {
     Switch,
     RadioGroup,
 } from "std-widgets.slint";
+import { AlertDialog, InfoCard } from "widgets.slint";
 
 
 
@@ -30,12 +31,15 @@ export component MainWindow inherits Window {
     in-out property <float> gpuFanRatio:-1;
     in-out property <int> cpuFan:-1;
     in-out property <int> gpuFan:-1;
+
+    in-out property <bool> show_reboot_alert;
     // 应用完成初始化
     in-out property <bool> initialized: false;
 
     callback onlineStatusToggled(bool);
     callback gpuToggled(bool);
     callback perfModeChange(int);
+    callback reboot();
 
     ScrollView {
         HorizontalLayout {
@@ -167,170 +171,64 @@ export component MainWindow inherits Window {
             VerticalBox {
                 alignment: start;
 
-                Rectangle {
-                    background: #FFFFFF;
-                    border-radius: 8px;
-                    VerticalBox {
-                        Text {
-                            text: "控制台在线状态";
-                            font-size: 16px;
-                            color: #405F90;
-                        }
-
-                        Text {
-                            text: onlineStatus ? "在线" : "离线";
-                            font-size: 24px;
-                            font-weight: 0;
-                        }
-                    }
+                InfoCard {
+                    title: "控制台在线状态";
+                    text: onlineStatus ? "在线" : "离线";
                 }
 
-                Rectangle {
-                    background: #FFFFFF;
-                    border-radius: 8px;
-                    VerticalBox {
-                        Text {
-                            text: "显卡状态";
-                            font-size: 16px;
-                            color: #405F90;
-                        }
-
-                        Text {
-                            text: nvidiaStatus ? "独显直连" : "混合输出";
-                            font-size: 24px;
-                            font-weight: 0;
-                        }
-                    }
+                InfoCard {
+                    title: "显卡状态";
+                    text: nvidiaStatus ? "独显直连" : "混合输出";
                 }
 
-                Rectangle {
-                    background: #FFFFFF;
-                    border-radius: 8px;
-                    VerticalBox {
-                        Text {
-                            text: "重启后的显卡状态";
-                            font-size: 16px;
-                            color: #405F90;
-                        }
-
-                        Text {
-                            text: nvidiaStatusAfterReboot ? "独显直连" : "混合输出";
-                            font-size: 24px;
-                            font-weight: 0;
-                        }
-                    }
+                InfoCard {
+                    title: "重启后的显卡状态";
+                    text: nvidiaStatusAfterReboot ? "独显直连" : "混合输出";
                 }
 
-                Rectangle {
+                InfoCard {
+                    title: "GPU 风扇转速百分比";
                     width: self.preferred-width;
-                    background: #FFFFFF;
-                    border-radius: 8px;
-                    VerticalBox {
-                        Text {
-                            text: "GPU 风扇转速百分比";
-                            font-size: 16px;
-                            color: #405F90;
-                        }
-
-                        Text {
-                            text: gpuFanRatio + "%";
-                            font-size: 24px;
-                            font-weight: 0;
-                        }
-                    }
+                    text: gpuFanRatio + "%";
                 }
 
-                Rectangle {
-                    background: #FFFFFF;
-                    border-radius: 8px;
-                    VerticalBox {
-                        Text {
-                            text: "CPU 风扇转速百分比";
-                            font-size: 16px;
-                            color: #405F90;
-                        }
-
-                        Text {
-                            text: cpuFanRatio + "%";
-                            font-size: 24px;
-                            font-weight: 0;
-                        }
-                    }
+                InfoCard {
+                    title: "CPU 风扇转速百分比";
+                    text: cpuFanRatio + "%";
                 }
 
-                Rectangle {
-                    background: #FFFFFF;
-                    border-radius: 8px;
-                    VerticalBox {
-                        Text {
-                            text: "GPU 风扇转速";
-                            font-size: 16px;
-                            color: #405F90;
-                        }
-
-                        Text {
-                            text: gpuFan;
-                            font-size: 24px;
-                            font-weight: 0;
-                        }
-                    }
+                InfoCard {
+                    title: "GPU 风扇转速";
+                    text: gpuFan;
                 }
 
-                Rectangle {
-                    background: #FFFFFF;
-                    border-radius: 8px;
-                    VerticalBox {
-                        Text {
-                            text: "CPU 风扇转速";
-                            font-size: 16px;
-                            color: #405F90;
-                        }
-
-                        Text {
-                            text: cpuFan;
-                            font-size: 24px;
-                            font-weight: 0;
-                        }
-                    }
+                InfoCard {
+                    title: "CPU 风扇转速";
+                    text: cpuFan;
                 }
             }
         }
     }
 
-    in-out property <bool> show_alert: false;
-    if show_alert: Rectangle {
-        background: #00000066;
+    in-out property <bool> show_acpi_call_alert: false;
+    AlertDialog {
+        is_open: show_acpi_call_alert;
+        title: "需要安装 ACPI Call";
+        text: "未在你的设备中找到 /proc/acpi/call 或安装后未重启, 请安装并重启电脑\n安装方法取决于你使用的 Linux 发行版\n如:\nsudo apt install acpi-call-dkms\nsudo pacman -S acpi_call-dkms";
+        confirm_text: "确定";
+        confirmed => { show_acpi_call_alert = false; }
+    }
 
-        Rectangle {
-            width: 320px;
-            height: 220px;
-            background: #ffffff;
-            border-radius: 12px;
-
-            VerticalBox {
-                padding: 20px;
-                alignment: space-between;
-
-                Text {
-                    text: "需要安装 ACPI Call";
-                    font-size: 18px;
-                    font-weight: 700;
-                }
-
-                Text {
-                    text: "未在你的设备中找到 /proc/acpi/call 或安装后未重启, 请安装并重启电脑\n安装方法取决于你的 Linux 发行版\n如:\nsudo pacman -S acpi_call-dkms";
-                    color: #333333;
-                    wrap: word-wrap;
-                }
-
-                Button {
-                    text: "确定";
-                    primary: true;
-                    clicked => {
-                        show_alert = false;
-                    }
-                }
-            }
+    AlertDialog {
+        is_open: show_reboot_alert;
+        title: "需要重启";
+        text: "需要重启以应用显卡设置, 是否立即重启?";
+        confirm_text: "确定";
+        cancel_text: "稍后";
+        confirmed => {
+            show_reboot_alert = false;
+            reboot();
         }
+        canceled => { show_reboot_alert = false; }
     }
 }

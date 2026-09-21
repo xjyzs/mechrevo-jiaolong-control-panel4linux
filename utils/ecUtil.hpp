@@ -1,9 +1,7 @@
 #pragma once
-#include <iostream>
 #include <string>
 #include <sstream>
 #include <iomanip>
-#include <cstdint>
 #include "sudoHelper.hpp"
 
 /**
@@ -11,11 +9,11 @@
  *
  * @return int 失败返回 -1
  */
-int readEc(int addr1, int addr2 = -1) {
+inline int readEc(int addr1, int addr2 = -1) {
     std::stringstream cmd;
 
     // 格式化为 0x0000 格式
-    auto to_hex_str = [](int addr) {
+    auto to_hex_str = [](const int addr) {
         std::stringstream ss;
         ss << "0x" << std::hex << std::setw(4) << std::setfill('0') << addr;
         return ss.str();
@@ -56,7 +54,7 @@ int readEc(int addr1, int addr2 = -1) {
 /**
  * @brief 写入 EC
  */
-bool writeEc(int addr, int value) {
+inline bool writeEc(int addr, int value) {
     std::stringstream cmd;
     cmd << "echo '\\_SB.INOU.ECRW 0x"
         << std::hex << std::setw(4) << std::setfill('0') << addr
